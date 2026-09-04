@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HtmlCAD Studio 3D - Clon de Tinkercad</title>
+  
+  <!-- Babylon.js CDN -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+
+  <!-- Fuentes e iconos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-main: #18191c;
+      --bg-panel: #222429;
+      --bg-panel-hover: #2c2f36;
+      --bg-surface: #2b2d35;
+      --border-color: #373a44;
+      --accent-color: #0084ff;
+      --accent-hover: #1a92ff;
+      --accent-active: #006dd4;
+      --danger-color: #f24e1e;
+      --text-main: #f0f2f5;
+      --text-muted: #9aa0a6;
+      --text-dim: #636873;
+      --grid-line: #3a3f4d;
+      --toolbar-h: 52px;
+      --sidebar-w: 240px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+    }
+
+    #app-container {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* ========================================================
+       TOP TOOLBAR
+       ======================================================== */
+    header#top-nav {
+      height: var(--toolbar-h);
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 20;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--accent-color);
+    }
+
+    .project-name {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .project-name:hover, .project-name:focus {
+      border-color: var(--border-color);
+      color: var(--text-main);
+      background: var(--bg-surface);
+      outline: none;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-surface);
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-tool {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s, transform 0.1s;
+    }
+
+    .btn-tool:hover:not(:disabled) {
+      background: var(--bg-panel-hover);
+      color: #fff;
+    }
+
+    .btn-tool:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .btn-tool:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .btn-tool.active {
+      background: var(--accent-color);
+      color: #fff;
+    }
+
+    .btn-tool svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+    }
+
+    .divider-v {
+      width: 1px;
+      height: 20px;
+      background: var(--border-color);
+      margin: 0 4px;
+    }
+
+    /* ========================================================
+       MAIN WORKSPACE
+       ======================================================== */
+    #workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #renderCanvas {
+      width: 100%;
+      height: 100%;
+      outline: none;
+      display: block;
+    }
+
+    /* ========================================================
+       FLOATING VIEW CONTROLS (Top-Left)
+       ======================================================== */
+    .view-gizmo-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(34, 36, 41, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+
+    .btn-view {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .btn-view:hover {
+      background: var(--bg-surface);
+      color: #fff;
+      border-color: var(--border-color);
+    }
+
+    /* ========================================================
+       RIGHT SIDEBAR: SHAPES PALETTE (Tinkercad Style)
+       ======================================================== */
+    #shapes-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: var(--sidebar-w);
+      max-height: calc(100% - 32px);
+      background: rgba(34, 36, 41, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .shapes-grid {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      overflow-y: auto;
+    }
+
+    .shape-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .shape-card:hover {
+      background: var(--bg-panel-hover);
+      border-color: var(--accent-color);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 132, 255, 0.2);
+    }
+
+    .shape-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .shape-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-main);
+      text-align: center;
+    }
+
+    /* ========================================================
+       FLOATING INSPECTOR PANEL (When Object is Selected)
+       ======================================================== */
+    #inspector-panel {
+      position: absolute;
+      top: 16px;
+      right: calc(var(--sidebar-w) + 28px);
+      width: 250px;
+      background: rgba(34, 36, 41, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      z-index: 10;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mode-switch {
+      display: flex;
+      background: var(--bg-main);
+      padding: 3px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 6px 0;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active-solid {
+      background: #0084ff;
+      color: #fff;
+    }
+
+    .mode-btn.active-hole {
+      background: #474b54;
+      color: #fff;
+      border: 1px dashed #bbb;
+    }
+
+    .prop-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .prop-row label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .prop-inputs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .num-input-wrap {
+      display: flex;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 2px 6px;
+      width: 60px;
+    }
+
+    .num-input-wrap span {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .num-input-wrap input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .color-picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .color-presets {
+      display: flex;
+      gap: 6px;
+    }
+
+    .color-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-dot:hover {
+      transform: scale(1.15);
+    }
+
+    .color-dot.selected {
+      border-color: #fff;
+    }
+
+    /* ========================================================
+       BOTTOM STATUS & SNAP BAR
+       ======================================================== */
+    footer#bottom-bar {
+      height: 34px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      z-index: 10;
+    }
+
+    .snap-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .snap-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .coords-display {
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* ========================================================
+       MODAL / DIALOG (Shortcuts & About)
+       ======================================================== */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 480px;
+      max-width: 90%;
+      padding: 20px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .shortcut-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+
+    .shortcut-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .kbd-tag {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-container">
+
+  <!-- ========================================================
+       HEADER / TOOLBAR
+       ======================================================== -->
+  <header id="top-nav">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <polygon points="12 2 2 8.5 12 15 22 8.5 12 2"></polygon>
+          <polygon points="2 15.5 12 22 22 15.5 22 8.5 12 15 2 8.5 2 15.5"></polygon>
+        </svg>
+        HtmlCAD 3D
+      </div>
+      <input type="text" class="project-name" id="doc-title" value="Mi_Diseño_3D" title="Clic para renombrar" />
+    </div>
+
+    <!-- Acciones de Modelado (Estilo Tinkercad) -->
+    <div class="toolbar-group">
+      <button class="btn-tool" id="btn-group" title="Agrupar sólidos y huecos (Ctrl+G)">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M4 4h16v16H4z"></path></svg>
+        <span>Agrupar</span>
+      </button>
+
+      <button class="btn-tool" id="btn-ungroup" title="Desagrupar formas combinadas (Ctrl+Shift+G)">
+        <svg viewBox="0 0 24 24"><path d="M4 14h6v6H4zM14 4h6v6h-6zM7 7l10 10"></path></svg>
+        <span>Desagrupar</span>
+      </button>
+
+      <div class="divider-v"></div>
+
+      <button class="btn-tool" id="btn-duplicate" title="Duplicar selección (Ctrl+D)">
+        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      </button>
+
+      <button class="btn-tool" id="btn-delete" title="Borrar selección (Del)">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+
+      <div class="divider-v"></div>
+
+      <button class="btn-tool" id="btn-drop" title="Soltar a la base / Suelo (D)">
+        <svg viewBox="0 0 24 24"><path d="M12 3v13m-5-5l5 5 5-5M3 21h18"></path></svg>
+        <span>A Suelo</span>
+      </button>
+
+      <div class="divider-v"></div>
+
+      <!-- Modos de Transformación (Gizmos) -->
+      <button class="btn-tool active" id="btn-gizmo-pos" title="Mover (W)">
+        <svg viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3M2 12h20M12 2v20"></path></svg>
+      </button>
+      <button class="btn-tool" id="btn-gizmo-rot" title="Rotar (E)">
+        <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l6.71-6.71"></path></svg>
+      </button>
+      <button class="btn-tool" id="btn-gizmo-scale" title="Escalar (R)">
+        <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+      </button>
+    </div>
+
+    <!-- Exportación y Ayuda -->
+    <div class="toolbar-group">
+      <button class="btn-tool" id="btn-export-stl" title="Exportar STL para impresión 3D">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
+        <strong>STL (3D Print)</strong>
+      </button>
+
+      <button class="btn-tool" id="btn-export-obj" title="Exportar OBJ">
+        <span>OBJ</span>
+      </button>
+
+      <button class="btn-tool" id="btn-save-json" title="Guardar Proyecto JSON">
+        <span>Guardar</span>
+      </button>
+
+      <label class="btn-tool" title="Cargar Proyecto JSON" style="margin:0;">
+        <span>Abrir</span>
+        <input type="file" id="file-input-json" accept=".json" style="display:none;" />
+      </label>
+
+      <button class="btn-tool" id="btn-shortcuts" title="Atajos de teclado">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       WORKSPACE & CANVAS
+       ======================================================== -->
+  <div id="workspace">
+
+    <!-- View Controls Flotantes -->
+    <div class="view-gizmo-bar">
+      <button class="btn-view" id="btn-view-top" title="Vista Superior">TOP</button>
+      <button class="btn-view" id="btn-view-front" title="Vista Frontal">FRT</button>
+      <button class="btn-view" id="btn-view-right" title="Vista Derecha">RGT</button>
+      <button class="btn-view" id="btn-view-iso" title="Vista Isométrica">ISO</button>
+      <div class="divider-v" style="width:100%; height:1px; margin:2px 0;"></div>
+      <button class="btn-view" id="btn-cam-toggle" title="Alternar Perspectiva / Ortográfica">ORTO</button>
+      <button class="btn-view" id="btn-view-fit" title="Enfocar todo (F)">FIT</button>
+    </div>
+
+    <!-- 3D WebGL Canvas -->
+    <canvas id="renderCanvas"></canvas>
+
+    <!-- FLOATING INSPECTOR (Properties of selected object) -->
+    <div id="inspector-panel">
+      <div class="panel-header" style="padding:0 0 8px 0;">
+        <span id="inspect-name" style="font-weight:700;">Objeto</span>
+        <span id="inspect-type" style="font-size:10px; color:var(--text-muted); font-family:monospace;">BOX</span>
+      </div>
+
+      <!-- Selector Sólido vs Hueco (Tinkercad) -->
+      <div class="mode-switch">
+        <button class="mode-btn active-solid" id="btn-set-solid">
+          <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24"><rect width="24" height="24" rx="4"/></svg>
+          Sólido
+        </button>
+        <button class="mode-btn" id="btn-set-hole">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="4" stroke-dasharray="3 3"/></svg>
+          Hueco
+        </button>
+      </div>
+
+      <!-- Paleta de Color para Sólido -->
+      <div class="color-picker-row" id="color-row">
+        <label style="font-size:11px; color:var(--text-muted);">Color</label>
+        <div class="color-presets">
+          <div class="color-dot selected" style="background:#e74c3c;" data-color="#e74c3c"></div>
+          <div class="color-dot" style="background:#3498db;" data-color="#3498db"></div>
+          <div class="color-dot" style="background:#2ecc71;" data-color="#2ecc71"></div>
+          <div class="color-dot" style="background:#f39c12;" data-color="#f39c12"></div>
+          <div class="color-dot" style="background:#9b59b6;" data-color="#9b59b6"></div>
+          <div class="color-dot" style="background:#ecf0f1;" data-color="#ecf0f1"></div>
+        </div>
+      </div>
+
+      <!-- Dimensiones en mm -->
+      <div class="prop-row">
+        <label>Tamaño (mm)</label>
+        <div class="prop-inputs">
+          <div class="num-input-wrap"><span>X</span><input type="number" id="inp-size-x" step="1"></div>
+          <div class="num-input-wrap"><span>Y</span><input type="number" id="inp-size-y" step="1"></div>
+          <div class="num-input-wrap"><span>Z</span><input type="number" id="inp-size-z" step="1"></div>
+        </div>
+      </div>
+
+      <!-- Posición -->
+      <div class="prop-row">
+        <label>Posición</label>
+        <div class="prop-inputs">
+          <div class="num-input-wrap"><span>X</span><input type="number" id="inp-pos-x" step="1"></div>
+          <div class="num-input-wrap"><span>Y</span><input type="number" id="inp-pos-y" step="1"></div>
+          <div class="num-input-wrap"><span>Z</span><input type="number" id="inp-pos-z" step="1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHAPES PALETTE (Right Sidebar) -->
+    <div id="shapes-panel">
+      <div class="panel-header">
+        <span>Formas Básicas</span>
+      </div>
+      <div class="shapes-grid">
+        <!-- Cubo Sólido -->
+        <div class="shape-card" data-shape="box" data-hole="false" title="Cubo Sólido">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <polygon points="16,4 28,10 16,16 4,10" fill="#e74c3c"/>
+              <polygon points="4,10 16,16 16,28 4,22" fill="#c0392b"/>
+              <polygon points="28,10 16,16 16,28 28,22" fill="#d63031"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cubo</span>
+        </div>
+
+        <!-- Cubo Hueco (Perforación) -->
+        <div class="shape-card" data-shape="box" data-hole="true" title="Cubo Perforación (Hueco)">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <polygon points="16,4 28,10 16,16 4,10" fill="none" stroke="#bbb" stroke-dasharray="2 2" stroke-width="1.5"/>
+              <polygon points="4,10 16,16 16,28 4,22" fill="none" stroke="#888" stroke-dasharray="2 2" stroke-width="1.5"/>
+              <polygon points="28,10 16,16 16,28 28,22" fill="none" stroke="#aaa" stroke-dasharray="2 2" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cubo (Hueco)</span>
+        </div>
+
+        <!-- Cilindro Sólido -->
+        <div class="shape-card" data-shape="cylinder" data-hole="false" title="Cilindro Sólido">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <ellipse cx="16" cy="9" rx="10" ry="4" fill="#3498db"/>
+              <path d="M6 9 v14 c0 2.2 4.5 4 10 4 s10 -1.8 10 -4 v-14 Z" fill="#2980b9"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cilindro</span>
+        </div>
+
+        <!-- Cilindro Hueco -->
+        <div class="shape-card" data-shape="cylinder" data-hole="true" title="Cilindro Perforación (Hueco)">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <ellipse cx="16" cy="9" rx="10" ry="4" fill="none" stroke="#bbb" stroke-dasharray="2 2" stroke-width="1.5"/>
+              <path d="M6 9 v14 c0 2.2 4.5 4 10 4 s10 -1.8 10 -4 v-14 Z" fill="none" stroke="#888" stroke-dasharray="2 2" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cilindro (H)</span>
+        </div>
+
+        <!-- Esfera -->
+        <div class="shape-card" data-shape="sphere" data-hole="false" title="Esfera">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <circle cx="16" cy="16" r="11" fill="url(#sphereGrad)"/>
+              <defs>
+                <radialGradient id="sphereGrad" cx="35%" cy="35%">
+                  <stop offset="0%" stop-color="#2ecc71"/>
+                  <stop offset="100%" stop-color="#27ae60"/>
+                </radialGradient>
+              </defs>
+            </svg>
+          </div>
+          <span class="shape-label">Esfera</span>
+        </div>
+
+        <!-- Cono -->
+        <div class="shape-card" data-shape="cone" data-hole="false" title="Cono">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <polygon points="16,4 27,24 5,24" fill="#f39c12"/>
+              <ellipse cx="16" cy="24" rx="11" ry="3" fill="#d35400"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cono</span>
+        </div>
+
+        <!-- Cuña / Rampa -->
+        <div class="shape-card" data-shape="wedge" data-hole="false" title="Cuña / Rampa">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <polygon points="6,24 26,24 26,8" fill="#9b59b6"/>
+              <polygon points="6,24 26,8 20,4 4,18" fill="#8e44ad"/>
+            </svg>
+          </div>
+          <span class="shape-label">Cuña</span>
+        </div>
+
+        <!-- Toroide / Tubo -->
+        <div class="shape-card" data-shape="torus" data-hole="false" title="Toroide">
+          <div class="shape-icon">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <circle cx="16" cy="16" r="10" fill="none" stroke="#1abc9c" stroke-width="4"/>
+            </svg>
+          </div>
+          <span class="shape-label">Tubo</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================
+       FOOTER STATUS BAR
+       ======================================================== -->
+  <footer id="bottom-bar">
+    <div class="snap-control">
+      <span>Rejilla Magnética:</span>
+      <select class="snap-select" id="snap-select">
+        <option value="1">1.0 mm</option>
+        <option value="5" selected>5.0 mm</option>
+        <option value="10">10.0 mm</option>
+        <option value="0">Desactivada</option>
+      </select>
+    </div>
+
+    <div class="coords-display">
+      <span>X: <strong id="lbl-pos-x">0.0</strong></span>
+      <span>Y: <strong id="lbl-pos-y">0.0</strong></span>
+      <span>Z: <strong id="lbl-pos-z">0.0</strong></span>
+      <span style="margin-left: 12px; color:var(--text-dim);">Objetos: <strong id="lbl-obj-count">0</strong></span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- MODAL DE ATAJOS -->
+<div class="modal-backdrop" id="shortcuts-modal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>Atajos de Teclado</span>
+      <button id="btn-close-modal" style="background:transparent; border:none; color:#fff; cursor:pointer; font-size:18px;">&times;</button>
+    </div>
+    <div class="shortcut-list">
+      <div class="shortcut-item"><span>Agrupar sólidos y huecos</span><span class="kbd-tag">Ctrl + G</span></div>
+      <div class="shortcut-item"><span>Desagrupar</span><span class="kbd-tag">Ctrl + Shift + G</span></div>
+      <div class="shortcut-item"><span>Duplicar objeto</span><span class="kbd-tag">Ctrl + D</span></div>
+      <div class="shortcut-item"><span>Borrar objeto</span><span class="kbd-tag">Del / Backspace</span></div>
+      <div class="shortcut-item"><span>Soltar a suelo</span><span class="kbd-tag">D</span></div>
+      <div class="shortcut-item"><span>Modo Mover</span><span class="kbd-tag">W</span></div>
+      <div class="shortcut-item"><span>Modo Rotar</span><span class="kbd-tag">E</span></div>
+      <div class="shortcut-item"><span>Modo Escalar</span><span class="kbd-tag">R</span></div>
+      <div class="shortcut-item"><span>Enfocar selección</span><span class="kbd-tag">F</span></div>
+      <div class="shortcut-item"><span>Órbita 3D</span><span class="kbd-tag">Botón Izquierdo</span></div>
+      <div class="shortcut-item"><span>Pan (Desplazamiento)</span><span class="kbd-tag">Botón Secundario o Rueda</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================
+     BABYLON.JS 3D ENGINE & TINKERCAD CLONE CORE LOGIC
+     ======================================================== -->
+<script>
+(() => {
+  'use strict';
+
+  // --- ESTADO GLOBAL ---
+  const state = {
+    canvas: document.getElementById('renderCanvas'),
+    engine: null,
+    scene: null,
+    camera: null,
+    gizmoManager: null,
+    gridGround: null,
+    holeMaterial: null,
+    
+    // Objetos activos en la escena
+    objects: new Map(), // id -> { mesh, metadata: { type, isHole, color, originalData, children } }
+    selectedMeshes: [],
+    
+    // Configuración
+    snapValue: 5.0,
+    activeGizmoMode: 'position', // 'position', 'rotation', 'scale'
+  };
+
+  // ==========================================================
+  // 1. INICIALIZACIÓN DE ESCENA Y MOTOR
+  // ==========================================================
+  function initEngine() {
+    state.engine = new BABYLON.Engine(state.canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    state.scene = new BABYLON.Scene(state.engine);
+    state.scene.clearColor = new BABYLON.Color4(0.09, 0.10, 0.12, 1.0);
+
+    // Cámara tipo CAD orbital
+    state.camera = new BABYLON.ArcRotateCamera(
+      "CadCamera",
+      -Math.PI / 3,
+      Math.PI / 3.2,
+      120,
+      new BABYLON.Vector3(0, 0, 0),
+      state.scene
+    );
+    state.camera.attachControl(state.canvas, true);
+    state.camera.lowerRadiusLimit = 5;
+    state.camera.upperRadiusLimit = 500;
+    state.camera.wheelPrecision = 15;
+    state.camera.panningSensibility = 100;
+    state.camera.panningMouseButton = 2; // Botón derecho para Pan
+
+    // Luces técnicas para contraste de aristas y caras
+    const hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), state.scene);
+    hemiLight.intensity = 0.75;
+    hemiLight.diffuse = new BABYLON.Color3(1, 1, 1);
+    hemiLight.groundColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+
+    const dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-1, -2, -1), state.scene);
+    dirLight.position = new BABYLON.Vector3(50, 80, 50);
+    dirLight.intensity = 0.55;
+
+    // Material especial para HUECOS (Transparente y grisáceo rayado tipo Tinkercad)
+    state.holeMaterial = new BABYLON.StandardMaterial("holeMat", state.scene);
+    state.holeMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.35, 0.4);
+    state.holeMaterial.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+    state.holeMaterial.alpha = 0.45;
+    state.holeMaterial.backFaceCulling = false;
+
+    // Crear suelo con cuadrícula milimétrica CAD (200x200mm)
+    createCadWorkplane(200, 200);
+
+    // Configurar Administrador de Gizmos (Manipuladores)
+    initGizmoManager();
+
+    // Eventos de picking y click
+    setupPicking();
+
+    // Render loop
+    state.engine.runRenderLoop(() => {
+      state.scene.render();
+    });
+
+    window.addEventListener('resize', () => state.engine.resize());
+  }
+
+  // Cuadrícula métrica milimétrica con líneas principales cada 10mm
+  function createCadWorkplane(width, height) {
+    const ground = BABYLON.MeshBuilder.CreateGround("workplane", { width, height, subdivisions: 2 }, state.scene);
+    ground.position.y = 0;
+    ground.isPickable = false;
+
+    const groundMat = new BABYLON.StandardMaterial("workplaneMat", state.scene);
+    
+    // Crear textura procedural de rejilla mediante canvas dinámico
+    const gridRes = 1024;
+    const dt = new BABYLON.DynamicTexture("gridTexture", gridRes, state.scene, true);
+    const ctx = dt.getContext();
+
+    // Fondo azulado oscuro técnico
+    ctx.fillStyle = "#1e222b";
+    ctx.fillRect(0, 0, gridRes, gridRes);
+
+    // Rejilla de 1mm (líneas finas)
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#2b303d";
+    const stepMinor = gridRes / 200; // 200mm
+    for (let i = 0; i <= gridRes; i += stepMinor) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0); ctx.lineTo(i, gridRes);
+      ctx.moveTo(0, i); ctx.lineTo(gridRes, i);
+      ctx.stroke();
+    }
+
+    // Rejilla de 10mm (líneas principales)
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#3e4759";
+    const stepMajor = stepMinor * 10;
+    for (let i = 0; i <= gridRes; i += stepMajor) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0); ctx.lineTo(i, gridRes);
+      ctx.moveTo(0, i); ctx.lineTo(gridRes, i);
+      ctx.stroke();
+    }
+
+    // Ejes centrales (Rojo X, Azul Z)
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#e74c3c"; // Eje X
+    ctx.beginPath();
+    ctx.moveTo(0, gridRes / 2); ctx.lineTo(gridRes, gridRes / 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#3498db"; // Eje Z
+    ctx.beginPath();
+    ctx.moveTo(gridRes / 2, 0); ctx.lineTo(gridRes, gridRes / 2);
+    ctx.stroke();
+
+    dt.update();
+    groundMat.diffuseTexture = dt;
+    groundMat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+    ground.material = groundMat;
+    state.gridGround = ground;
+  }
+
+  // ==========================================================
+  // 2. GIZMOS Y MANIPULACIÓN DIRECTA
+  // ==========================================================
+  function initGizmoManager() {
+    const gm = new BABYLON.GizmoManager(state.scene);
+    gm.usePointerToAttachGizmos = false;
+    gm.positionGizmoEnabled = true;
+    gm.rotationGizmoEnabled = false;
+    gm.scaleGizmoEnabled = false;
+    gm.boundingBoxGizmoEnabled = false;
+
+    // Configurar sensibilidad y snapping
+    if (gm.gizmos.positionGizmo) {
+      gm.gizmos.positionGizmo.snapDistance = state.snapValue;
+    }
+    if (gm.gizmos.rotationGizmo) {
+      gm.gizmos.rotationGizmo.snapDistance = Math.PI / 8; // 22.5 grados
+    }
+
+    state.gizmoManager = gm;
+  }
+
+  function setGizmoMode(mode) {
+    state.activeGizmoMode = mode;
+    state.gizmoManager.positionGizmoEnabled = (mode === 'position');
+    state.gizmoManager.rotationGizmoEnabled = (mode === 'rotation');
+    state.gizmoManager.scaleGizmoEnabled = (mode === 'scale');
+
+    document.getElementById('btn-gizmo-pos').classList.toggle('active', mode === 'position');
+    document.getElementById('btn-gizmo-rot').classList.toggle('active', mode === 'rotation');
+    document.getElementById('btn-gizmo-scale').classList.toggle('active', mode === 'scale');
+  }
+
+  // ==========================================================
+  // 3. GESTIÓN DE FORMAS Y CREACIÓN (PRIMITIVAS CAD)
+  // ==========================================================
+  let objectIdCounter = 1;
+
+  function createShape(type, isHole = false, initialColor = "#e74c3c") {
+    let mesh = null;
+    const name = `cad_${type}_${objectIdCounter++}`;
+
+    switch (type) {
+      case 'box':
+        mesh = BABYLON.MeshBuilder.CreateBox(name, { width: 20, height: 20, depth: 20 }, state.scene);
+        mesh.position.y = 10; // Apoyado en la rejilla
+        break;
+
+      case 'cylinder':
+        mesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 20, height: 20, tessellation: 32 }, state.scene);
+        mesh.position.y = 10;
+        break;
+
+      case 'sphere':
+        mesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 20, segments: 24 }, state.scene);
+        mesh.position.y = 10;
+        break;
+
+      case 'cone':
+        mesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 20, height: 25, tessellation: 32 }, state.scene);
+        mesh.position.y = 12.5;
+        break;
+
+      case 'wedge': {
+        // Cuña o rampa usando CreateBox y sesgo o polígono simple
+        mesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 20, height: 20, tessellation: 4 }, state.scene);
+        mesh.rotation.y = Math.PI / 4;
+        mesh.position.y = 10;
+        break;
+      }
+
+      case 'torus':
+        mesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 24, thickness: 6, tessellation: 32 }, state.scene);
+        mesh.position.y = 3;
+        break;
+
+      default:
+        mesh = BABYLON.MeshBuilder.CreateBox(name, { size: 20 }, state.scene);
+        mesh.position.y = 10;
+    }
+
+    // Material y estilo
+    applyMeshStyle(mesh, isHole, initialColor);
+
+    // Activar líneas de ingeniería técnica CAD (Edges)
+    mesh.enableEdgesRendering(0.95);
+    mesh.edgesWidth = 2.0;
+    mesh.edgesColor = isHole ? new BABYLON.Color4(0.8, 0.8, 0.8, 0.7) : new BABYLON.Color4(0.1, 0.1, 0.1, 0.9);
+
+    // Registrar en el estado
+    const meta = {
+      id: mesh.name,
+      type: type,
+      isHole: isHole,
+      color: initialColor,
+      children: null, // Si es un grupo resultante de CSG
+    };
+    mesh.metadata = meta;
+    state.objects.set(mesh.name, { mesh, metadata: meta });
+
+    selectMesh(mesh);
+    updateObjectCount();
+    return mesh;
+  }
+
+  function applyMeshStyle(mesh, isHole, colorHex) {
+    if (isHole) {
+      mesh.material = state.holeMaterial;
+      mesh.edgesColor = new BABYLON.Color4(0.85, 0.85, 0.85, 0.8);
+    } else {
+      const mat = new BABYLON.StandardMaterial("mat_" + mesh.name, state.scene);
+      mat.diffuseColor = BABYLON.Color3.FromHexString(colorHex);
+      mat.specularColor = new BABYLON.Color3(0.25, 0.25, 0.25);
+      mesh.material = mat;
+      mesh.edgesColor = new BABYLON.Color4(0.1, 0.1, 0.1, 0.9);
+    }
+  }
+
+  // ==========================================================
+  // 4. SISTEMA DE SELECCIÓN Y PICKING
+  // ==========================================================
+  function setupPicking() {
+    state.scene.onPointerDown = (evt, pickResult) => {
+      // Si se hace clic izquierdo sobre un objeto seleccionable
+      if (evt.button === 0) {
+        if (pickResult.hit && pickResult.pickedMesh && pickResult.pickedMesh !== state.gridGround) {
+          // Buscar si el mesh está en nuestro registro de objetos
+          let target = pickResult.pickedMesh;
+          while (target && !state.objects.has(target.name) && target.parent) {
+            target = target.parent;
+          }
+
+          if (target && state.objects.has(target.name)) {
+            if (evt.shiftKey) {
+              // Selección múltiple con Shift
+              toggleMultiSelect(target);
+            } else {
+              selectMesh(target);
+            }
+            return;
+          }
+        } else if (!pickResult.hit || pickResult.pickedMesh === state.gridGround) {
+          // Clic al vacío deselecciona
+          if (!evt.shiftKey) {
+            clearSelection();
+          }
+        }
+      }
+    };
+
+    // Actualizar coordenadas del cursor en tiempo real
+    state.scene.onPointerMove = (evt) => {
+      const pick = state.scene.pick(state.scene.pointerX, state.scene.pointerY, (m) => m === state.gridGround);
+      if (pick.hit && pick.pickedPoint) {
+        document.getElementById('lbl-pos-x').innerText = pick.pickedPoint.x.toFixed(1);
+        document.getElementById('lbl-pos-y').innerText = pick.pickedPoint.y.toFixed(1);
+        document.getElementById('lbl-pos-z').innerText = pick.pickedPoint.z.toFixed(1);
+      }
+    };
+  }
+
+  function selectMesh(mesh) {
+    state.selectedMeshes = [mesh];
+    state.gizmoManager.attachToMesh(mesh);
+    updateInspectorUI(mesh);
+  }
+
+  function toggleMultiSelect(mesh) {
+    const idx = state.selectedMeshes.indexOf(mesh);
+    if (idx >= 0) {
+      state.selectedMeshes.splice(idx, 1);
+    } else {
+      state.selectedMeshes.push(mesh);
+    }
+
+    if (state.selectedMeshes.length > 0) {
+      state.gizmoManager.attachToMesh(state.selectedMeshes[state.selectedMeshes.length - 1]);
+      updateInspectorUI(state.selectedMeshes[state.selectedMeshes.length - 1]);
+    } else {
+      clearSelection();
+    }
+  }
+
+  function clearSelection() {
+    state.selectedMeshes = [];
+    state.gizmoManager.attachToMesh(null);
+    document.getElementById('inspector-panel').style.display = 'none';
+  }
+
+  // ==========================================================
+  // 5. MOTOR BOOLEANO CSG: AGRUPAR Y DESAGRUPAR (Tinkercad Core)
+  // ==========================================================
+  function groupSelected() {
+    if (state.selectedMeshes.length < 2) {
+      alert("Selecciona al menos 2 objetos para agrupar (usa Shift + Clic).");
+      return;
+    }
+
+    const solids = [];
+    const holes = [];
+
+    // Separar en sólidos y huecos
+    state.selectedMeshes.forEach(mesh => {
+      if (mesh.metadata.isHole) {
+        holes.push(mesh);
+      } else {
+        solids.push(mesh);
+      }
+    });
+
+    if (solids.length === 0) {
+      alert("Debes incluir al menos un objeto Sólido en el grupo.");
+      return;
+    }
+
+    try {
+      // 1. Convertir y unir todos los sólidos
+      let currentCSG = BABYLON.CSG.FromMesh(solids[0]);
+      for (let i = 1; i < solids.length; i++) {
+        const nextCSG = BABYLON.CSG.FromMesh(solids[i]);
+        currentCSG = currentCSG.union(nextCSG);
+      }
+
+      // 2. Restar todos los huecos (perforaciones)
+      for (let i = 0; i < holes.length; i++) {
+        const holeCSG = BABYLON.CSG.FromMesh(holes[i]);
+        currentCSG = currentCSG.subtract(holeCSG);
+      }
+
+      // 3. Crear la nueva malla combinada resultante
+      const groupName = `cad_group_${objectIdCounter++}`;
+      const baseSolid = solids[0];
+      const resultMesh = currentCSG.toMesh(groupName, baseSolid.material, state.scene, true);
+
+      // Guardar árbol de hijos para permitir DESAGRUPAR
+      const childrenData = state.selectedMeshes.map(m => serializeMesh(m));
+
+      // Configurar aristas técnicas CAD en el nuevo sólido
+      resultMesh.enableEdgesRendering(0.95);
+      resultMesh.edgesWidth = 2.0;
+      resultMesh.edgesColor = new BABYLON.Color4(0.1, 0.1, 0.1, 0.9);
+
+      const meta = {
+        id: groupName,
+        type: 'group',
+        isHole: false,
+        color: baseSolid.metadata.color,
+        children: childrenData
+      };
+      resultMesh.metadata = meta;
+
+      // 4. Eliminar las mallas originales de la escena
+      state.selectedMeshes.forEach(m => {
+        state.objects.delete(m.name);
+        m.dispose();
+      });
+
+      // Registrar nuevo grupo
+      state.objects.set(groupName, { mesh: resultMesh, metadata: meta });
+      selectMesh(resultMesh);
+      updateObjectCount();
+
+    } catch (err) {
+      console.error("Error al procesar operación booleana CSG:", err);
+      alert("No se pudo completar la operación de agrupación con las geometrías seleccionadas.");
+    }
+  }
+
+  function ungroupSelected() {
+    if (state.selectedMeshes.length !== 1) {
+      alert("Selecciona un único grupo para desagrupar.");
+      return;
+    }
+
+    const mesh = state.selectedMeshes[0];
+    if (!mesh.metadata || !mesh.metadata.children || mesh.metadata.children.length === 0) {
+      alert("El objeto seleccionado no es un grupo compuesto.");
+      return;
+    }
+
+    const childrenData = mesh.metadata.children;
+
+    // Eliminar el grupo actual
+    state.objects.delete(mesh.name);
+    mesh.dispose();
+
+    // Reconstruir los hijos originales
+    const restoredMeshes = [];
+    childrenData.forEach(data => {
+      const restored = deserializeMesh(data);
+      restoredMeshes.push(restored);
+    });
+
+    state.selectedMeshes = restoredMeshes;
+    if (restoredMeshes.length > 0) {
+      selectMesh(restoredMeshes[0]);
+    }
+    updateObjectCount();
+  }
+
+  // ==========================================================
+  // 6. ACCIONES: DUPLICAR, BORRAR, SOLTAR A SUELO
+  // ==========================================================
+  function duplicateSelected() {
+    if (state.selectedMeshes.length === 0) return;
+
+    const newSelection = [];
+    state.selectedMeshes.forEach(mesh => {
+      const data = serializeMesh(mesh);
+      // Desplazar ligeramente en X y Z para distinguirlo
+      data.position.x += 10;
+      data.position.z += 10;
+      const clone = deserializeMesh(data);
+      newSelection.push(clone);
+    });
+
+    if (newSelection.length > 0) {
+      selectMesh(newSelection[0]);
+    }
+    updateObjectCount();
+  }
+
+  function deleteSelected() {
+    if (state.selectedMeshes.length === 0) return;
+
+    state.selectedMeshes.forEach(mesh => {
+      state.objects.delete(mesh.name);
+      mesh.dispose();
+    });
+
+    clearSelection();
+    updateObjectCount();
+  }
+
+  function dropToWorkplane() {
+    if (state.selectedMeshes.length === 0) return;
+
+    state.selectedMeshes.forEach(mesh => {
+      mesh.computeWorldMatrix(true);
+      const bInfo = mesh.getBoundingInfo();
+      const minY = bInfo.boundingBox.minimumWorld.y;
+      mesh.position.y -= minY;
+    });
+
+    if (state.selectedMeshes.length === 1) {
+      updateInspectorUI(state.selectedMeshes[0]);
+    }
+  }
+
+  // ==========================================================
+  // 7. SERIALIZACIÓN / GUARDADO / CARGA JSON
+  // ==========================================================
+  function serializeMesh(mesh) {
+    mesh.computeWorldMatrix(true);
+    const bInfo = mesh.getBoundingInfo();
+    const size = bInfo.boundingBox.maximum.subtract(bInfo.boundingBox.minimum);
+
+    return {
+      name: mesh.name,
+      type: mesh.metadata.type,
+      isHole: mesh.metadata.isHole,
+      color: mesh.metadata.color,
+      children: mesh.metadata.children || null,
+      position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+      rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
+      scaling: { x: mesh.scaling.x, y: mesh.scaling.y, z: mesh.scaling.z },
+      size: { x: size.x * mesh.scaling.x, y: size.y * mesh.scaling.y, z: size.z * mesh.scaling.z }
+    };
+  }
+
+  function deserializeMesh(data) {
+    let mesh = null;
+    if (data.type === 'group' && data.children) {
+      // Recrear grupo
+      const tempChildren = data.children.map(c => deserializeMesh(c));
+      state.selectedMeshes = tempChildren;
+      groupSelected();
+      mesh = state.selectedMeshes[0];
+      return mesh;
+    } else {
+      mesh = createShape(data.type, data.isHole, data.color);
+      mesh.position.set(data.position.x, data.position.y, data.position.z);
+      mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+      mesh.scaling.set(data.scaling.x, data.scaling.y, data.scaling.z);
+      applyMeshStyle(mesh, data.isHole, data.color);
+      return mesh;
+    }
+  }
+
+  function saveProjectJson() {
+    const project = {
+      title: document.getElementById('doc-title').value || "Proyecto_CAD",
+      version: "1.0",
+      objects: []
+    };
+
+    state.objects.forEach(({ mesh }) => {
+      project.objects.push(serializeMesh(mesh));
+    });
+
+    const jsonStr = JSON.stringify(project, null, 2);
+    downloadFile(jsonStr, `${project.title}.cad3d.json`, "application/json");
+  }
+
+  function loadProjectJson(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const project = JSON.parse(e.target.result);
+        if (!project.objects) throw new Error("Formato inválido");
+
+        // Limpiar escena actual
+        state.objects.forEach(({ mesh }) => mesh.dispose());
+        state.objects.clear();
+        clearSelection();
+
+        document.getElementById('doc-title').value = project.title || "Proyecto_CAD";
+        project.objects.forEach(data => deserializeMesh(data));
+        updateObjectCount();
+      } catch (err) {
+        alert("Error al cargar el archivo JSON: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ==========================================================
+  // 8. EXPORTACIÓN A STL (Impresión 3D) Y OBJ
+  // ==========================================================
+  function exportSTL() {
+    // Tomar todos los objetos sólidos activos de la escena
+    const solidMeshes = [];
+    state.objects.forEach(({ mesh }) => {
+      if (!mesh.metadata.isHole) {
+        solidMeshes.push(mesh);
+      }
+    });
+
+    if (solidMeshes.length === 0) {
+      alert("No hay ningún sólido en la escena para exportar a STL.");
+      return;
+    }
+
+    // Generar formato STL ASCII estándar
+    let stl = `solid HtmlCAD_${document.getElementById('doc-title').value}\n`;
+
+    solidMeshes.forEach(mesh => {
+      mesh.computeWorldMatrix(true);
+      const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+      const indices = mesh.getIndices();
+      const worldMatrix = mesh.getWorldMatrix();
+
+      if (!positions || !indices) return;
+
+      for (let i = 0; i < indices.length; i += 3) {
+        const i1 = indices[i] * 3;
+        const i2 = indices[i + 1] * 3;
+        const i3 = indices[i + 2] * 3;
+
+        const v1 = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(positions[i1], positions[i1+1], positions[i1+2]), worldMatrix);
+        const v2 = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(positions[i2], positions[i2+1], positions[i2+2]), worldMatrix);
+        const v3 = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(positions[i3], positions[i3+1], positions[i3+2]), worldMatrix);
+
+        // Vector normal
+        const cb = v3.subtract(v2);
+        const ab = v1.subtract(v2);
+        const normal = BABYLON.Vector3.Cross(cb, ab).normalize();
+
+        stl += `  facet normal ${normal.x.toFixed(6)} ${normal.y.toFixed(6)} ${normal.z.toFixed(6)}\n`;
+        stl += `    outer loop\n`;
+        stl += `      vertex ${v1.x.toFixed(4)} ${v1.y.toFixed(4)} ${v1.z.toFixed(4)}\n`;
+        stl += `      vertex ${v2.x.toFixed(4)} ${v2.y.toFixed(4)} ${v2.z.toFixed(4)}\n`;
+        stl += `      vertex ${v3.x.toFixed(4)} ${v3.y.toFixed(4)} ${v3.z.toFixed(4)}\n`;
+        stl += `    endloop\n`;
+        stl += `  endfacet\n`;
+      }
+    });
+
+    stl += `endsolid\n`;
+    downloadFile(stl, `${document.getElementById('doc-title').value}.stl`, "text/plain");
+  }
+
+  function exportOBJ() {
+    let obj = `# HtmlCAD 3D Export\no Model\n`;
+    let vertexOffset = 1;
+
+    state.objects.forEach(({ mesh }) => {
+      if (mesh.metadata.isHole) return;
+
+      mesh.computeWorldMatrix(true);
+      const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+      const indices = mesh.getIndices();
+      const worldMatrix = mesh.getWorldMatrix();
+
+      if (!positions || !indices) return;
+
+      for (let i = 0; i < positions.length; i += 3) {
+        const v = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(positions[i], positions[i+1], positions[i+2]), worldMatrix);
+        obj += `v ${v.x.toFixed(4)} ${v.y.toFixed(4)} ${v.z.toFixed(4)}\n`;
+      }
+
+      for (let i = 0; i < indices.length; i += 3) {
+        const a = indices[i] + vertexOffset;
+        const b = indices[i + 1] + vertexOffset;
+        const c = indices[i + 2] + vertexOffset;
+        obj += `f ${a} ${b} ${c}\n`;
+      }
+
+      vertexOffset += positions.length / 3;
+    });
+
+    downloadFile(obj, `${document.getElementById('doc-title').value}.obj`, "text/plain");
+  }
+
+  function downloadFile(content, fileName, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ==========================================================
+  // 9. PANEL INSPECTOR (PROPIEDADES FLOTANTES)
+  // ==========================================================
+  function updateInspectorUI(mesh) {
+    if (!mesh || !mesh.metadata) {
+      document.getElementById('inspector-panel').style.display = 'none';
+      return;
+    }
+
+    const panel = document.getElementById('inspector-panel');
+    panel.style.display = 'flex';
+
+    document.getElementById('inspect-name').innerText = mesh.name;
+    document.getElementById('inspect-type').innerText = mesh.metadata.type.toUpperCase();
+
+    // Estado Sólido vs Hueco
+    const isHole = mesh.metadata.isHole;
+    const btnSolid = document.getElementById('btn-set-solid');
+    const btnHole = document.getElementById('btn-set-hole');
+    btnSolid.className = isHole ? 'mode-btn' : 'mode-btn active-solid';
+    btnHole.className = isHole ? 'mode-btn active-hole' : 'mode-btn';
+    document.getElementById('color-row').style.display = isHole ? 'none' : 'flex';
+
+    // Dimensiones
+    mesh.computeWorldMatrix(true);
+    const bInfo = mesh.getBoundingInfo();
+    const size = bInfo.boundingBox.maximum.subtract(bInfo.boundingBox.minimum);
+
+    document.getElementById('inp-size-x').value = (size.x * mesh.scaling.x).toFixed(1);
+    document.getElementById('inp-size-y').value = (size.y * mesh.scaling.y).toFixed(1);
+    document.getElementById('inp-size-z').value = (size.z * mesh.scaling.z).toFixed(1);
+
+    document.getElementById('inp-pos-x').value = mesh.position.x.toFixed(1);
+    document.getElementById('inp-pos-y').value = mesh.position.y.toFixed(1);
+    document.getElementById('inp-pos-z').value = mesh.position.z.toFixed(1);
+  }
+
+  function updateObjectCount() {
+    document.getElementById('lbl-obj-count').innerText = state.objects.size;
+  }
+
+  // ==========================================================
+  // 10. ATAJOS DE TECLADO Y CONTROLES DE VISTA
+  // ==========================================================
+  function setupKeybindings() {
+    window.addEventListener('keydown', (e) => {
+      // Ignorar si se está escribiendo en un input
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          ungroupSelected();
+        } else {
+          groupSelected();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        duplicateSelected();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteSelected();
+      } else if (e.key.toLowerCase() === 'd') {
+        dropToWorkplane();
+      } else if (e.key.toLowerCase() === 'w') {
+        setGizmoMode('position');
+      } else if (e.key.toLowerCase() === 'e') {
+        setGizmoMode('rotation');
+      } else if (e.key.toLowerCase() === 'r') {
+        setGizmoMode('scale');
+      } else if (e.key.toLowerCase() === 'f') {
+        if (state.selectedMeshes.length > 0) {
+          state.camera.setTarget(state.selectedMeshes[0].position);
+        }
+      }
+    });
+  }
+
+  function setupViewButtons() {
+    document.getElementById('btn-view-top').onclick = () => {
+      state.camera.alpha = -Math.PI / 2;
+      state.camera.beta = 0.01;
+    };
+    document.getElementById('btn-view-front').onclick = () => {
+      state.camera.alpha = -Math.PI / 2;
+      state.camera.beta = Math.PI / 2;
+    };
+    document.getElementById('btn-view-right').onclick = () => {
+      state.camera.alpha = 0;
+      state.camera.beta = Math.PI / 2;
+    };
+    document.getElementById('btn-view-iso').onclick = () => {
+      state.camera.alpha = -Math.PI / 3;
+      state.camera.beta = Math.PI / 3.2;
+    };
+    document.getElementById('btn-cam-toggle').onclick = (e) => {
+      if (state.camera.mode === BABYLON.Camera.PERSPECTIVE_CAMERA) {
+        state.camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+        const aspect = state.canvas.width / state.canvas.height;
+        const orthoSize = 50;
+        state.camera.orthoTop = orthoSize;
+        state.camera.orthoBottom = -orthoSize;
+        state.camera.orthoLeft = -orthoSize * aspect;
+        state.camera.orthoRight = orthoSize * aspect;
+        e.currentTarget.innerText = "PERS";
+      } else {
+        state.camera.mode = BABYLON.Camera.PERSPECTIVE_CAMERA;
+        state.camera.orthoTop = null;
+        state.camera.orthoBottom = null;
+        state.camera.orthoLeft = null;
+        state.camera.orthoRight = null;
+        e.currentTarget.innerText = "ORTO";
+      }
+    };
+    document.getElementById('btn-view-fit').onclick = () => {
+      state.camera.setTarget(BABYLON.Vector3.Zero());
+      state.camera.radius = 120;
+    };
+  }
+
+  // ==========================================================
+  // 11. ENLACE DE EVENTOS DE LA INTERFAZ (DOM LISTENERS)
+  // ==========================================================
+  function setupUIEvents() {
+    // Toolbar buttons
+    document.getElementById('btn-group').onclick = groupSelected;
+    document.getElementById('btn-ungroup').onclick = ungroupSelected;
+    document.getElementById('btn-duplicate').onclick = duplicateSelected;
+    document.getElementById('btn-delete').onclick = deleteSelected;
+    document.getElementById('btn-drop').onclick = dropToWorkplane;
+
+    document.getElementById('btn-gizmo-pos').onclick = () => setGizmoMode('position');
+    document.getElementById('btn-gizmo-rot').onclick = () => setGizmoMode('rotation');
+    document.getElementById('btn-gizmo-scale').onclick = () => setGizmoMode('scale');
+
+    document.getElementById('btn-export-stl').onclick = exportSTL;
+    document.getElementById('btn-export-obj').onclick = exportOBJ;
+    document.getElementById('btn-save-json').onclick = saveProjectJson;
+
+    document.getElementById('file-input-json').onchange = (e) => {
+      if (e.target.files.length > 0) loadProjectJson(e.target.files[0]);
+    };
+
+    // Formas de la barra lateral (clic para añadir al centro de la cuadrícula)
+    document.querySelectorAll('.shape-card').forEach(card => {
+      card.onclick = () => {
+        const shapeType = card.getAttribute('data-shape');
+        const isHole = card.getAttribute('data-hole') === 'true';
+        createShape(shapeType, isHole);
+      };
+    });
+
+    // Cambiar a Sólido / Hueco en el inspector
+    document.getElementById('btn-set-solid').onclick = () => {
+      if (state.selectedMeshes.length > 0) {
+        const m = state.selectedMeshes[0];
+        m.metadata.isHole = false;
+        applyMeshStyle(m, false, m.metadata.color);
+        updateInspectorUI(m);
+      }
+    };
+
+    document.getElementById('btn-set-hole').onclick = () => {
+      if (state.selectedMeshes.length > 0) {
+        const m = state.selectedMeshes[0];
+        m.metadata.isHole = true;
+        applyMeshStyle(m, true, m.metadata.color);
+        updateInspectorUI(m);
+      }
+    };
+
+    // Selector de color para sólidos
+    document.querySelectorAll('.color-dot').forEach(dot => {
+      dot.onclick = () => {
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+        dot.classList.add('selected');
+        const hex = dot.getAttribute('data-color');
+        if (state.selectedMeshes.length > 0) {
+          const m = state.selectedMeshes[0];
+          m.metadata.color = hex;
+          if (!m.metadata.isHole) {
+            applyMeshStyle(m, false, hex);
+          }
+        }
+      };
+    });
+
+    // Inputs de posición
+    ['x', 'y', 'z'].forEach(axis => {
+      const input = document.getElementById(`inp-pos-${axis}`);
+      input.onchange = () => {
+        if (state.selectedMeshes.length > 0) {
+          state.selectedMeshes[0].position[axis] = parseFloat(input.value) || 0;
+        }
+      };
+    });
+
+    // Snap selector
+    document.getElementById('snap-select').onchange = (e) => {
+      state.snapValue = parseFloat(e.target.value);
+      if (state.gizmoManager.gizmos.positionGizmo) {
+        state.gizmoManager.gizmos.positionGizmo.snapDistance = state.snapValue;
+      }
+    };
+
+    // Modal de atajos
+    const modal = document.getElementById('shortcuts-modal');
+    document.getElementById('btn-shortcuts').onclick = () => modal.style.display = 'flex';
+    document.getElementById('btn-close-modal').onclick = () => modal.style.display = 'none';
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+  }
+
+  // ==========================================================
+  // 12. ARRANQUE PRINCIPAL
+  // ==========================================================
+  window.addEventListener('DOMContentLoaded', () => {
+    initEngine();
+    setupKeybindings();
+    setupViewButtons();
+    setupUIEvents();
+
+    // Crear formas iniciales de demostración: un cubo rojo y un cilindro azul apoyados
+    const box = createShape('box', false, '#e74c3c');
+    box.position.x = -15;
+
+    const cyl = createShape('cylinder', false, '#3498db');
+    cyl.position.x = 15;
+
+    // Deseleccionar al inicio para vista limpia
+    clearSelection();
+  });
+
+})();
+</script>
+</body>
+</html>
